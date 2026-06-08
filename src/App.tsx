@@ -1,4 +1,3 @@
-// src/App.tsx
 import { Grid } from '@mui/material';
 import Header from './Header';
 import Alerts from './Alerts';
@@ -7,51 +6,53 @@ import Indicators from './Indicators';
 import SalesChart from './SalesChart';
 import FormatsTable from './FormatsTable';
 import Footer from './Footer';
+import './App.css';
 
 function App() {
   return (
     <Grid
       container
       spacing={3}
-      sx={{ justifyContent: 'center', alignItems: 'flex-start', p: 2, backgroundColor: '#f5f5f5', minHeight: '100vh' }}
+      sx={{
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        p: { xs: 2, md: 3 },
+        background: 'radial-gradient(circle at center, #121620 0%, #07090e 100%)',
+        minHeight: '100vh',
+        color: '#a0aec0',
+        fontFamily: "'Courier New', Courier, monospace",
+      }}
     >
-      {/* Encabezado */}
       <Grid size={{ xs: 12, md: 12 }}>
         <Header />
       </Grid>
 
-      {/* Alertas */}
       <Grid size={{ xs: 12, md: 12 }}>
         <Alerts />
       </Grid>
 
-      {/* Selector */}
       <Grid size={{ xs: 12, md: 3 }}>
         <Selector />
       </Grid>
 
-      {/* Indicadores */}
       <Grid size={{ xs: 12, md: 9 }}>
         <Indicators />
       </Grid>
 
-      {/* Gráfico */}
       <Grid
-        size={{ xs: 12, md: 6 }}
+        size={{ xs: 12, md: 7 }}
         sx={{ display: { xs: 'none', md: 'block' } }}
       >
         <SalesChart />
       </Grid>
 
-      {/* Tabla */}
       <Grid
-        size={{ xs: 12, md: 6 }}
+        size={{ xs: 12, md: 5 }}
         sx={{ display: { xs: 'none', md: 'block' } }}
       >
         <FormatsTable />
       </Grid>
 
-      {/* Información adicional */}
       <Grid size={{ xs: 12, md: 12 }}>
         <Footer />
       </Grid>
