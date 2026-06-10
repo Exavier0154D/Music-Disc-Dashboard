@@ -79,7 +79,6 @@ type StreamRow = { year: string; rev: number };
  
 // ─── Data transformation helpers ──────────────────────────────────────────────
 function buildYearlyData(records: MusicRecord[]): YearlyRow[] {
-  // Only use "Value (Adjusted)" metric, group by year
   const adjusted = records.filter(r => r.Metric === 'Value (Adjusted)');
   const byYear: Record<number, YearlyRow> = {};
  
@@ -98,13 +97,13 @@ function buildYearlyData(records: MusicRecord[]): YearlyRow[] {
     }
     const key = formatKey[r.Format];
     if (key) {
-      byYear[r.Year][key] += (r['Value(Actual)'] ?? 0) / 1000; // convert millions → billions
+      byYear[r.Year][key] += (r['Value(Actual)'] ?? 0) / 1000;
     }
   });
  
   return Object.values(byYear)
     .sort((a, b) => Number(a.year) - Number(b.year))
-    .filter(r => Number(r.year) % 2 === 1 || Number(r.year) >= 2020); // keep odd years + recent
+    .filter(r => Number(r.year) % 2 === 1 || Number(r.year) >= 2020);
 }
  
 function buildVinylRevival(records: MusicRecord[]): VinylRow[] {
@@ -157,7 +156,6 @@ function buildShare2022(records: MusicRecord[]) {
     color: colorMap[name] ?? C_OTHER,
   }));
   items.sort((a, b) => b.value - a.value);
-  // Merge small items into "Other"
   const main = items.filter(i => i.value >= 2);
   const otherVal = items.filter(i => i.value < 2).reduce((s, i) => s + i.value, 0);
   if (otherVal > 0) main.push({ name: 'Other', value: otherVal, color: C_OTHER });
@@ -280,7 +278,7 @@ const PanelShell = ({ title, controls, children }: {
       </Typography>
       {controls && <Box>{controls}</Box>}
     </Box>
-    <Box sx={{ p: 2 }}>{children}</Box>
+    <Box sx={{ p: 2, height: 'calc(100% - 33px)', boxSizing: 'border-box' }}>{children}</Box>
   </Paper>
 );
  
@@ -347,7 +345,7 @@ const RevenueStackedChart = ({ data }: { data: YearlyRow[] }) => (
         </Stack>
       ))}
     </Stack>
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height="80%">
       <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <defs>
           {[
@@ -381,13 +379,13 @@ const StreamingGrowthChart = ({ data }: { data: StreamRow[] }) => {
   const pct = latest && prev ? Math.round(((latest.rev - prev.rev) / prev.rev) * 100) : 8;
   return (
     <PanelShell title="Streaming revenue · 2010–2022" controls={<DeskKnob label="ZOOM" color={C_STREAMING} />}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
-        <Typography variant="h4" sx={{ color: C_STREAMING, fontWeight: 700 }}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
+        <Typography variant="h5" sx={{ color: C_STREAMING, fontWeight: 700 }}>
           ${latest?.rev ?? 13.3}B
         </Typography>
         <Typography variant="caption" sx={{ color: C_VINYL, fontSize: '0.7rem' }}>↑ {pct}% vs prev year</Typography>
       </Box>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height="70%">
         <BarChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
           <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} />
@@ -406,9 +404,9 @@ const StreamingGrowthChart = ({ data }: { data: StreamRow[] }) => {
  
 const FormatShareChart = ({ data }: { data: { name: string; value: number; color: string }[] }) => (
   <PanelShell title="2022 format share" controls={<DeskKnob label="PAN" color={ACCENT_PINK} />}>
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height="55%">
       <PieChart>
-        <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
+        <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={2} dataKey="value">
           {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} fillOpacity={0.85} />
           ))}
@@ -416,14 +414,14 @@ const FormatShareChart = ({ data }: { data: { name: string; value: number; color
         <Tooltip contentStyle={tooltipStyle} formatter={fmtPct} />
       </PieChart>
     </ResponsiveContainer>
-    <Stack spacing={0.5}>
+    <Stack spacing={0.3} sx={{ mt: 1 }}>
       {data.map(({ name, value, color }) => (
         <Box key={name} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
-            <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>{name}</Typography>
+            <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.65rem' }}>{name}</Typography>
           </Stack>
-          <Typography variant="caption" sx={{ color: TEXT_PRIMARY, fontWeight: 600, fontSize: '0.7rem' }}>{value}%</Typography>
+          <Typography variant="caption" sx={{ color: TEXT_PRIMARY, fontWeight: 600, fontSize: '0.65rem' }}>{value}%</Typography>
         </Box>
       ))}
     </Stack>
@@ -434,11 +432,11 @@ const VinylRevivalChart = ({ data }: { data: VinylRow[] }) => {
   const latest = data[data.length - 1];
   return (
     <PanelShell title="Vinyl revival · units shipped (M)" controls={<DeskKnob label="BASS" color={C_VINYL} />}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
-        <Typography variant="h4" sx={{ color: C_VINYL, fontWeight: 700 }}>{latest?.units ?? 41.3}M</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
+        <Typography variant="h5" sx={{ color: C_VINYL, fontWeight: 700 }}>{latest?.units ?? 41.3}M</Typography>
         <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>units in {latest?.year ?? 2022}</Typography>
       </Box>
-      <ResponsiveContainer width="100%" height={170}>
+      <ResponsiveContainer width="100%" height="70%">
         <LineChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
           <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} interval={2} />
@@ -463,14 +461,14 @@ const topGenres = [
  
 const GenreShareChart = () => (
   <PanelShell title="Genre share · 2022" controls={<DeskKnob label="HIGH" color={ACCENT_PINK} />}>
-    <Stack spacing={1}>
+    <Stack spacing={0.8}>
       {topGenres.map(({ genre, share, color }) => (
         <Box key={genre}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
-            <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.68rem' }}>{genre}</Typography>
-            <Typography variant="caption" sx={{ color: TEXT_PRIMARY, fontWeight: 600, fontSize: '0.68rem' }}>{share}%</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.2 }}>
+            <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.65rem' }}>{genre}</Typography>
+            <Typography variant="caption" sx={{ color: TEXT_PRIMARY, fontWeight: 600, fontSize: '0.65rem' }}>{share}%</Typography>
           </Box>
-          <Box sx={{ height: 5, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' }}>
+          <Box sx={{ height: 4, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' }}>
             <Box sx={{ height: '100%', width: `${share * (100 / 26.8)}%`, backgroundColor: color, borderRadius: 3, opacity: 0.85 }} />
           </Box>
         </Box>
@@ -497,12 +495,12 @@ const ChannelSelector = () => {
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                 <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: value === i ? color : BORDER, flexShrink: 0 }} />
-                <Typography variant="caption" sx={{ fontSize: '0.7rem', textAlign: 'left' }}>{label}</Typography>
+                <Typography variant="caption" sx={{ fontSize: '0.68rem', textAlign: 'left' }}>{label}</Typography>
               </Box>
             }
             sx={{
-              color: TEXT_MUTED, minHeight: '44px', alignItems: 'flex-start',
-              borderBottom: `1px solid ${BORDER}`, textTransform: 'none', px: 1.5,
+              color: TEXT_MUTED, minHeight: '38px', alignItems: 'flex-start',
+              borderBottom: `1px solid ${BORDER}`, textTransform: 'none', px: 1,
               '&.Mui-selected': { color: channels[value].color },
             }}
           />
@@ -514,25 +512,25 @@ const ChannelSelector = () => {
  
 const LevelMeters = () => (
   <PanelShell title="Level meters">
-    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'center', mb: 2 }}>
+    <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mb: 1 }}>
       {[
         { ch: 'STR', pct: 84, color: C_STREAMING },
         { ch: 'VNL', pct: 8, color: C_VINYL },
         { ch: 'CD', pct: 3, color: C_CD },
         { ch: 'DL', pct: 4, color: C_DOWNLOAD },
       ].map(({ ch, pct, color }) => (
-        <Box key={ch} sx={{ textAlign: 'center', width: 32 }}>
-          <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.55rem' }}>{ch}</Typography>
+        <Box key={ch} sx={{ textAlign: 'center', width: 28 }}>
+          <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.5rem' }}>{ch}</Typography>
           <Box sx={{
-            width: '100%', height: 110, background: SURFACE_RAISED,
-            border: `1px solid ${BORDER}`, borderRadius: '2px', position: 'relative', overflow: 'hidden', mt: 0.5,
+            width: '100%', height: 85, background: SURFACE_RAISED,
+            border: `1px solid ${BORDER}`, borderRadius: '2px', position: 'relative', overflow: 'hidden', mt: 0.3,
           }}>
             <Box sx={{
               position: 'absolute', bottom: 0, width: '100%', height: `${pct}%`,
               background: `linear-gradient(to top, ${color}, ${color}88)`, transition: 'height 0.5s',
             }} />
           </Box>
-          <Typography variant="caption" sx={{ color, fontSize: '0.55rem', fontWeight: 700 }}>{pct}%</Typography>
+          <Typography variant="caption" sx={{ color, fontSize: '0.5rem', fontWeight: 700 }}>{pct}%</Typography>
         </Box>
       ))}
     </Stack>
@@ -568,7 +566,7 @@ const MixerFooter = () => (
   </Box>
 );
  
-// ─── App ───────────────────────────────────────────────────────────────────────
+// ─── App Component (Full Width & Height Layout) ────────────────────────────────
 function App() {
   const [records, setRecords] = useState<MusicRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -588,17 +586,26 @@ function App() {
     fetchData();
   }, []);
  
-  // Derive chart datasets from Firestore records (or fallback while loading)
   const yearlyData   = loading ? FALLBACK_YEARLY : buildYearlyData(records);
   const vinylRevival = loading ? [] : buildVinylRevival(records);
   const streamingGrowth = loading ? [] : buildStreamingGrowth(records);
   const share2022    = loading ? [] : buildShare2022(records);
  
   return (
-    <Box sx={{ backgroundColor: BG_DARK, minHeight: '100vh', color: TEXT_PRIMARY, fontFamily: '"Inter", "Roboto", sans-serif' }}>
+    <Box 
+      sx={{ 
+        backgroundColor: BG_DARK, 
+        minHeight: '100vh', 
+        height: '100vh', 
+        display: 'flex',
+        flexDirection: 'column',
+        color: TEXT_PRIMARY, 
+        fontFamily: '"Inter", "Roboto", sans-serif',
+        overflow: 'hidden'
+      }}
+    >
       <MixerHeader />
  
-      {/* Loading indicator */}
       {loading && (
         <Box sx={{ px: 2, pt: 1 }}>
           <Typography variant="caption" sx={{ color: ACCENT_TEAL, fontSize: '0.65rem', letterSpacing: 1 }}>
@@ -607,48 +614,63 @@ function App() {
         </Box>
       )}
  
-      <Box sx={{ px: 2, pt: 2, pb: 0 }}>
-        <Grid container spacing={1.5}>
-          {[
-            { label: 'Peak revenue', value: '$22.4B', sub: 'Year 1999 (adj.)', icon: <MusicNoteIcon fontSize="small" />, color: C_CD, trend: undefined },
-            { label: '2022 revenue', value: '$15.9B', sub: '↑ 9% vs 2021', icon: <TrendingUpIcon fontSize="small" />, color: C_STREAMING, trend: 'up' as const },
-            { label: 'Streaming share', value: '84%', sub: 'of 2022 total', icon: <HeadphonesIcon fontSize="small" />, color: ACCENT_TEAL, trend: 'up' as const },
-            { label: 'Vinyl units', value: '41.3M', sub: 'Highest since 1987', icon: <AlbumIcon fontSize="small" />, color: C_VINYL, trend: 'up' as const },
-            { label: 'CD decline', value: '97%', sub: 'Drop from 2000 peak', icon: <TrendingDownIcon fontSize="small" />, color: C_DOWNLOAD, trend: 'down' as const },
-          ].map(props => (
-            <Grid key={props.label} size={{ xs: 6, sm: 4, md: 2.4 }}>
-              <MetricCard {...props} />
+      {/* Contenedor central flexible sin limitación de ancho (Ocupa el 100% de la ventana) */}
+      <Box sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, overflowY: 'auto', width: '100%', boxSizing: 'border-box' }}>
+        
+        {/* Fila superior: Métricas ampliadas de extremo a extremo */}
+        <Box sx={{ width: '100%' }}>
+          <Grid container spacing={1.5}>
+            {[
+              { label: 'Peak revenue', value: '$22.4B', sub: 'Year 1999 (adj.)', icon: <MusicNoteIcon fontSize="small" />, color: C_CD, trend: undefined },
+              { label: '2022 revenue', value: '$15.9B', sub: '↑ 9% vs 2021', icon: <TrendingUpIcon fontSize="small" />, color: C_STREAMING, trend: 'up' as const },
+              { label: 'Streaming share', value: '84%', sub: 'of 2022 total', icon: <HeadphonesIcon fontSize="small" />, color: ACCENT_TEAL, trend: 'up' as const },
+              { label: 'Vinyl units', value: '41.3M', sub: 'Highest since 1987', icon: <AlbumIcon fontSize="small" />, color: C_VINYL, trend: 'up' as const },
+              { label: 'CD decline', value: '97%', sub: 'Drop from 2000 peak', icon: <TrendingDownIcon fontSize="small" />, color: C_DOWNLOAD, trend: 'down' as const },
+            ].map(props => (
+              <Grid key={props.label} size={{ xs: 6, sm: 4, md: 2.4 }}>
+                <MetricCard {...props} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+ 
+        {/* Fila inferior: Rejilla de gráficos estirada */}
+        <Box sx={{ width: '100%', flexGrow: 1 }}>
+          <Grid container spacing={1.5} sx={{ height: '100%' }}>
+            
+            {/* Gráfico de área principal de ancho completo */}
+            <Grid size={{ xs: 12 }}>
+              <RevenueStackedChart data={yearlyData} />
             </Grid>
-          ))}
-        </Grid>
+            
+            {/* Controles verticales */}
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Stack spacing={1.5} sx={{ height: '100%' }}>
+                <ChannelSelector />
+                <LevelMeters />
+              </Stack>
+            </Grid>
+            
+            {/* Gráficos de barra y línea */}
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Stack spacing={1.5} sx={{ height: '100%', justifyContent: 'space-between' }}>
+                <StreamingGrowthChart data={streamingGrowth} />
+                <VinylRevivalChart data={vinylRevival} />
+              </Stack>
+            </Grid>
+            
+            {/* Gráficos de pastel y progreso */}
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Stack spacing={1.5} sx={{ height: '100%', justifyContent: 'space-between' }}>
+                <FormatShareChart data={share2022} />
+                <GenreShareChart />
+              </Stack>
+            </Grid>
+ 
+          </Grid>
+        </Box>
       </Box>
  
-      <Box sx={{ px: 2, pt: 2 }}>
-        <Grid container spacing={1.5}>
-          <Grid size={{ xs: 12 }}>
-            <RevenueStackedChart data={yearlyData} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-            <Stack spacing={1.5} sx={{ height: '100%' }}>
-              <ChannelSelector />
-              <LevelMeters />
-            </Stack>
-          </Grid>
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Stack spacing={1.5}>
-              <StreamingGrowthChart data={streamingGrowth} />
-              <VinylRevivalChart data={vinylRevival} />
-            </Stack>
-          </Grid>
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Stack spacing={1.5}>
-              <FormatShareChart data={share2022} />
-              <GenreShareChart />
-            </Stack>
-          </Grid>
-        </Grid>
-      </Box>
-      <Box sx={{ height: 12 }} />
       <MixerFooter />
     </Box>
   );
