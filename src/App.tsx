@@ -1,5 +1,5 @@
 import {
-  Grid2 as Grid,
+  Grid as Grid,
   Box,
   Typography,
   Paper,
@@ -35,7 +35,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts';
  
 // ─── Theme tokens ──────────────────────────────────────────────────────────────
@@ -46,13 +45,12 @@ const BORDER = '#333844';
 const TEXT_PRIMARY = '#e8eaf0';
 const TEXT_MUTED = '#7a8299';
  
-// Accent palette – each format gets its own distinct color
-const C_STREAMING = '#4f8ef7';   // blue
-const C_CD = '#a855f7';          // purple
-const C_CASSETTE = '#f59e0b';    // amber
-const C_VINYL = '#10b981';       // emerald
-const C_DOWNLOAD = '#ef4444';    // red
-const C_OTHER = '#64748b';       // slate
+const C_STREAMING = '#4f8ef7';
+const C_CD = '#a855f7';
+const C_CASSETTE = '#f59e0b';
+const C_VINYL = '#10b981';
+const C_DOWNLOAD = '#ef4444';
+const C_OTHER = '#64748b';
  
 const ACCENT_TEAL = '#2dd4bf';
 const ACCENT_PINK = '#f472b6';
@@ -121,8 +119,24 @@ const topGenres = [
   { genre: 'Other', share: 19.6, color: C_OTHER },
 ];
  
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// ─── Shared tooltip formatter helpers ─────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fmtDollar = (value: any, name: any): [string, string] => [
+  `$${Number(value ?? 0).toFixed(1)}B`,
+  String(name ?? ''),
+];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fmtUnits = (value: any, name: any): [string, string] => [
+  `${Number(value ?? 0).toFixed(1)}M`,
+  String(name ?? ''),
+];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fmtPct = (value: any, name: any): [string, string] => [
+  `${value ?? 0}%`,
+  String(name ?? ''),
+];
  
+// ─── Sub-components ────────────────────────────────────────────────────────────
 const tooltipStyle = {
   backgroundColor: SURFACE_RAISED,
   border: `1px solid ${BORDER}`,
@@ -132,27 +146,16 @@ const tooltipStyle = {
 };
  
 const DeskKnob = ({ label, color = ACCENT_TEAL }: { label: string; color?: string }) => (
-  <Box display="flex" flexDirection="column" alignItems="center" mx={0.5}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mx: 0.5 }}>
     <Box
       sx={{
-        width: 26,
-        height: 26,
-        borderRadius: '50%',
+        width: 26, height: 26, borderRadius: '50%',
         background: `radial-gradient(circle at 35% 35%, #444c5c, #2a2d33)`,
-        border: `2px solid ${BORDER}`,
-        position: 'relative',
-        cursor: 'pointer',
+        border: `2px solid ${BORDER}`, position: 'relative', cursor: 'pointer',
         '&::after': {
-          content: '""',
-          position: 'absolute',
-          width: '2px',
-          height: '11px',
-          backgroundColor: color,
-          top: '3px',
-          left: 'calc(50% - 1px)',
-          borderRadius: '1px',
-          transform: 'rotate(-40deg)',
-          transformOrigin: 'bottom center',
+          content: '""', position: 'absolute', width: '2px', height: '11px',
+          backgroundColor: color, top: '3px', left: 'calc(50% - 1px)',
+          borderRadius: '1px', transform: 'rotate(-40deg)', transformOrigin: 'bottom center',
         },
         '&:hover': { borderColor: color },
       }}
@@ -169,18 +172,12 @@ const DeskFader = ({ label, color = ACCENT_TEAL }: { label: string; color?: stri
       {label}
     </Typography>
     <Slider
-      orientation="horizontal"
-      defaultValue={65}
-      size="small"
+      orientation="horizontal" defaultValue={65} size="small"
       sx={{
         color,
         '& .MuiSlider-thumb': {
-          width: 7,
-          height: 14,
-          borderRadius: 1,
-          backgroundColor: '#555e71',
-          border: `1px solid ${BORDER}`,
-          '&:hover': { boxShadow: `0 0 8px ${color}88` },
+          width: 7, height: 14, borderRadius: 1, backgroundColor: '#555e71',
+          border: `1px solid ${BORDER}`, '&:hover': { boxShadow: `0 0 8px ${color}88` },
           '&::before': { display: 'none' },
         },
         '& .MuiSlider-track': { height: 2 },
@@ -191,36 +188,17 @@ const DeskFader = ({ label, color = ACCENT_TEAL }: { label: string; color?: stri
 );
  
 const MetricCard = ({
-  label,
-  value,
-  sub,
-  trend,
-  icon,
-  color = ACCENT_TEAL,
+  label, value, sub, trend, icon, color = ACCENT_TEAL,
 }: {
-  label: string;
-  value: string;
-  sub: string;
-  trend?: 'up' | 'down';
-  icon: React.ReactNode;
-  color?: string;
+  label: string; value: string; sub: string; trend?: 'up' | 'down';
+  icon: React.ReactNode; color?: string;
 }) => (
-  <Paper
-    elevation={0}
-    sx={{
-      background: SURFACE,
-      border: `1px solid ${BORDER}`,
-      borderTop: `2px solid ${color}`,
-      borderRadius: '4px',
-      p: 2,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 1,
-      transition: 'border-color 0.2s',
-      '&:hover': { borderColor: color, boxShadow: `0 0 12px ${color}22` },
-    }}
-  >
-    <Box display="flex" alignItems="center" justifyContent="space-between">
+  <Paper elevation={0} sx={{
+    background: SURFACE, border: `1px solid ${BORDER}`, borderTop: `2px solid ${color}`,
+    borderRadius: '4px', p: 2, display: 'flex', flexDirection: 'column', gap: 1,
+    transition: 'border-color 0.2s', '&:hover': { borderColor: color, boxShadow: `0 0 12px ${color}22` },
+  }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <Typography variant="caption" sx={{ color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}>
         {label}
       </Typography>
@@ -229,7 +207,7 @@ const MetricCard = ({
     <Typography variant="h5" sx={{ color: TEXT_PRIMARY, fontWeight: 700, letterSpacing: '-0.5px' }}>
       {value}
     </Typography>
-    <Box display="flex" alignItems="center" gap={0.5}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       {trend === 'up' && <TrendingUpIcon sx={{ fontSize: 14, color: C_VINYL }} />}
       {trend === 'down' && <TrendingDownIcon sx={{ fontSize: 14, color: C_DOWNLOAD }} />}
       <Typography variant="caption" sx={{ color: trend === 'up' ? C_VINYL : trend === 'down' ? C_DOWNLOAD : TEXT_MUTED, fontSize: '0.7rem' }}>
@@ -239,36 +217,11 @@ const MetricCard = ({
   </Paper>
 );
  
-const PanelShell = ({
-  title,
-  controls,
-  children,
-}: {
-  title: string;
-  controls?: React.ReactNode;
-  children: React.ReactNode;
+const PanelShell = ({ title, controls, children }: {
+  title: string; controls?: React.ReactNode; children: React.ReactNode;
 }) => (
-  <Paper
-    elevation={0}
-    sx={{
-      background: SURFACE,
-      border: `1px solid ${BORDER}`,
-      borderRadius: '4px',
-      overflow: 'hidden',
-      height: '100%',
-    }}
-  >
-    <Box
-      sx={{
-        background: SURFACE_RAISED,
-        borderBottom: `1px solid ${BORDER}`,
-        px: 2,
-        py: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
+  <Paper elevation={0} sx={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '4px', overflow: 'hidden', height: '100%' }}>
+    <Box sx={{ background: SURFACE_RAISED, borderBottom: `1px solid ${BORDER}`, px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <Typography variant="caption" sx={{ color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: 1.5, fontSize: '0.65rem' }}>
         {title}
       </Typography>
@@ -280,25 +233,15 @@ const PanelShell = ({
  
 // ─── Header ────────────────────────────────────────────────────────────────────
 const MixerHeader = () => (
-  <Box
-    sx={{
-      background: SURFACE_RAISED,
-      borderBottom: `1px solid ${BORDER}`,
-      px: 2,
-      py: 1.5,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      position: 'relative',
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0, left: 0, right: 0,
-        height: '2px',
-        background: `linear-gradient(90deg, ${C_STREAMING}, ${C_CD}, ${ACCENT_PINK}, ${C_CASSETTE}, ${C_VINYL})`,
-      },
-    }}
-  >
+  <Box sx={{
+    background: SURFACE_RAISED, borderBottom: `1px solid ${BORDER}`,
+    px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    position: 'relative',
+    '&::before': {
+      content: '""', position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+      background: `linear-gradient(90deg, ${C_STREAMING}, ${C_CD}, ${ACCENT_PINK}, ${C_CASSETTE}, ${C_VINYL})`,
+    },
+  }}>
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
       <PowerSettingsNewIcon sx={{ color: ACCENT_TEAL, fontSize: 18 }} />
       <Box>
@@ -310,21 +253,15 @@ const MixerHeader = () => (
         </Typography>
       </Box>
     </Stack>
- 
     <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
       <DeskKnob label="GAIN" color={C_STREAMING} />
       <DeskKnob label="TRIM" color={C_CD} />
       <DeskKnob label="EQ" color={C_CASSETTE} />
     </Stack>
- 
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
       {['1983–2022', 'USD adj.'].map(t => (
-        <Chip
-          key={t}
-          label={t}
-          size="small"
-          sx={{ backgroundColor: SURFACE, color: TEXT_MUTED, border: `1px solid ${BORDER}`, fontSize: '0.6rem', height: 20 }}
-        />
+        <Chip key={t} label={t} size="small"
+          sx={{ backgroundColor: SURFACE, color: TEXT_MUTED, border: `1px solid ${BORDER}`, fontSize: '0.6rem', height: 20 }} />
       ))}
       <AccountCircleIcon sx={{ color: TEXT_MUTED, fontSize: 20 }} />
     </Stack>
@@ -332,7 +269,6 @@ const MixerHeader = () => (
 );
  
 // ─── Chart panels ──────────────────────────────────────────────────────────────
- 
 const RevenueStackedChart = () => (
   <PanelShell
     title="Revenue by format — 1983 to 2022"
@@ -362,10 +298,8 @@ const RevenueStackedChart = () => (
       <AreaChart data={yearlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <defs>
           {[
-            { id: 'gStream', color: C_STREAMING },
-            { id: 'gCD', color: C_CD },
-            { id: 'gCass', color: C_CASSETTE },
-            { id: 'gVinyl', color: C_VINYL },
+            { id: 'gStream', color: C_STREAMING }, { id: 'gCD', color: C_CD },
+            { id: 'gCass', color: C_CASSETTE }, { id: 'gVinyl', color: C_VINYL },
             { id: 'gDL', color: C_DOWNLOAD },
           ].map(({ id, color }) => (
             <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
@@ -377,12 +311,12 @@ const RevenueStackedChart = () => (
         <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
         <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 11 }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fill: TEXT_MUTED, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}B`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`$${v.toFixed(1)}B`, name]} />
-        <Area type="monotone" dataKey="streaming" name="Streaming" stackId="1" stroke={C_STREAMING} fill={`url(#gStream)`} strokeWidth={2} />
-        <Area type="monotone" dataKey="download" name="Downloads" stackId="1" stroke={C_DOWNLOAD} fill={`url(#gDL)`} strokeWidth={2} />
-        <Area type="monotone" dataKey="cd" name="CD" stackId="1" stroke={C_CD} fill={`url(#gCD)`} strokeWidth={2} />
-        <Area type="monotone" dataKey="cassette" name="Cassette" stackId="1" stroke={C_CASSETTE} fill={`url(#gCass)`} strokeWidth={2} />
-        <Area type="monotone" dataKey="vinyl" name="Vinyl" stackId="1" stroke={C_VINYL} fill={`url(#gVinyl)`} strokeWidth={2} />
+        <Tooltip contentStyle={tooltipStyle} formatter={fmtDollar} />
+        <Area type="monotone" dataKey="streaming" name="Streaming" stackId="1" stroke={C_STREAMING} fill="url(#gStream)" strokeWidth={2} />
+        <Area type="monotone" dataKey="download" name="Downloads" stackId="1" stroke={C_DOWNLOAD} fill="url(#gDL)" strokeWidth={2} />
+        <Area type="monotone" dataKey="cd" name="CD" stackId="1" stroke={C_CD} fill="url(#gCD)" strokeWidth={2} />
+        <Area type="monotone" dataKey="cassette" name="Cassette" stackId="1" stroke={C_CASSETTE} fill="url(#gCass)" strokeWidth={2} />
+        <Area type="monotone" dataKey="vinyl" name="Vinyl" stackId="1" stroke={C_VINYL} fill="url(#gVinyl)" strokeWidth={2} />
       </AreaChart>
     </ResponsiveContainer>
   </PanelShell>
@@ -390,7 +324,7 @@ const RevenueStackedChart = () => (
  
 const StreamingGrowthChart = () => (
   <PanelShell title="Streaming revenue · 2010–2022" controls={<DeskKnob label="ZOOM" color={C_STREAMING} />}>
-    <Box display="flex" alignItems="baseline" gap={1} mb={1.5}>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
       <Typography variant="h4" sx={{ color: C_STREAMING, fontWeight: 700 }}>$13.3B</Typography>
       <Typography variant="caption" sx={{ color: C_VINYL, fontSize: '0.7rem' }}>↑ 8% vs 2021</Typography>
     </Box>
@@ -399,7 +333,7 @@ const StreamingGrowthChart = () => (
         <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
         <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}B`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`$${v.toFixed(1)}B`, 'Revenue']} />
+        <Tooltip contentStyle={tooltipStyle} formatter={fmtDollar} />
         <Bar dataKey="rev" name="Revenue" fill={C_STREAMING} radius={[3, 3, 0, 0]}>
           {streamingGrowth.map((_, i) => (
             <Cell key={i} fill={i === streamingGrowth.length - 1 ? ACCENT_TEAL : C_STREAMING} fillOpacity={0.7 + (i / streamingGrowth.length) * 0.3} />
@@ -414,25 +348,17 @@ const FormatShareChart = () => (
   <PanelShell title="2022 format share" controls={<DeskKnob label="PAN" color={ACCENT_PINK} />}>
     <ResponsiveContainer width="100%" height={200}>
       <PieChart>
-        <Pie
-          data={share2022}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={85}
-          paddingAngle={2}
-          dataKey="value"
-        >
+        <Pie data={share2022} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
           {share2022.map((entry, i) => (
             <Cell key={i} fill={entry.color} fillOpacity={0.85} />
           ))}
         </Pie>
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v}%`, name]} />
+        <Tooltip contentStyle={tooltipStyle} formatter={fmtPct} />
       </PieChart>
     </ResponsiveContainer>
     <Stack spacing={0.5}>
       {share2022.map(({ name, value, color }) => (
-        <Box key={name} display="flex" alignItems="center" justifyContent="space-between">
+        <Box key={name} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
             <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>{name}</Typography>
@@ -446,7 +372,7 @@ const FormatShareChart = () => (
  
 const VinylRevivalChart = () => (
   <PanelShell title="Vinyl revival · units shipped (M)" controls={<DeskKnob label="BASS" color={C_VINYL} />}>
-    <Box display="flex" alignItems="baseline" gap={1} mb={1.5}>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
       <Typography variant="h4" sx={{ color: C_VINYL, fontWeight: 700 }}>41.3M</Typography>
       <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>units in 2022</Typography>
     </Box>
@@ -455,7 +381,7 @@ const VinylRevivalChart = () => (
         <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
         <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} interval={2} />
         <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}M units`, 'Vinyl']} />
+        <Tooltip contentStyle={tooltipStyle} formatter={fmtUnits} />
         <Line type="monotone" dataKey="units" stroke={C_VINYL} strokeWidth={2.5} dot={{ fill: C_VINYL, r: 3 }} activeDot={{ r: 5 }} />
       </LineChart>
     </ResponsiveContainer>
@@ -472,15 +398,7 @@ const GenreShareChart = () => (
             <Typography variant="caption" sx={{ color: TEXT_PRIMARY, fontWeight: 600, fontSize: '0.68rem' }}>{share}%</Typography>
           </Box>
           <Box sx={{ height: 5, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' }}>
-            <Box
-              sx={{
-                height: '100%',
-                width: `${share * (100 / 26.8)}%`,
-                backgroundColor: color,
-                borderRadius: 3,
-                opacity: 0.85,
-              }}
-            />
+            <Box sx={{ height: '100%', width: `${share * (100 / 26.8)}%`, backgroundColor: color, borderRadius: 3, opacity: 0.85 }} />
           </Box>
         </Box>
       ))}
@@ -499,33 +417,19 @@ const ChannelSelector = () => {
   ];
   return (
     <PanelShell title="Channel select">
-      <Tabs
-        value={value}
-        onChange={(_e, v) => setValue(v)}
-        orientation="vertical"
-        variant="scrollable"
-        sx={{ '& .MuiTabs-indicator': { display: 'none' }, minHeight: 'unset' }}
-      >
+      <Tabs value={value} onChange={(_e, v) => setValue(v)} orientation="vertical" variant="scrollable"
+        sx={{ '& .MuiTabs-indicator': { display: 'none' }, minHeight: 'unset' }}>
         {channels.map(({ label, color }, i) => (
-          <Tab
-            key={i}
+          <Tab key={i}
             label={
-              <Box display="flex" alignItems="center" gap={1} width="100%">
-                <Box sx={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  backgroundColor: value === i ? color : BORDER,
-                  flexShrink: 0,
-                }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: value === i ? color : BORDER, flexShrink: 0 }} />
                 <Typography variant="caption" sx={{ fontSize: '0.7rem', textAlign: 'left' }}>{label}</Typography>
               </Box>
             }
             sx={{
-              color: TEXT_MUTED,
-              minHeight: '44px',
-              alignItems: 'flex-start',
-              borderBottom: `1px solid ${BORDER}`,
-              textTransform: 'none',
-              px: 1.5,
+              color: TEXT_MUTED, minHeight: '44px', alignItems: 'flex-start',
+              borderBottom: `1px solid ${BORDER}`, textTransform: 'none', px: 1.5,
               '&.Mui-selected': { color: channels[value].color },
             }}
           />
@@ -547,22 +451,12 @@ const LevelMeters = () => (
         <Box key={ch} sx={{ textAlign: 'center', width: 32 }}>
           <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.55rem' }}>{ch}</Typography>
           <Box sx={{
-            width: '100%',
-            height: 110,
-            background: SURFACE_RAISED,
-            border: `1px solid ${BORDER}`,
-            borderRadius: '2px',
-            position: 'relative',
-            overflow: 'hidden',
-            mt: 0.5,
+            width: '100%', height: 110, background: SURFACE_RAISED,
+            border: `1px solid ${BORDER}`, borderRadius: '2px', position: 'relative', overflow: 'hidden', mt: 0.5,
           }}>
             <Box sx={{
-              position: 'absolute',
-              bottom: 0,
-              width: '100%',
-              height: `${pct}%`,
-              background: `linear-gradient(to top, ${color}, ${color}88)`,
-              transition: 'height 0.5s',
+              position: 'absolute', bottom: 0, width: '100%', height: `${pct}%`,
+              background: `linear-gradient(to top, ${color}, ${color}88)`, transition: 'height 0.5s',
             }} />
           </Box>
           <Typography variant="caption" sx={{ color, fontSize: '0.55rem', fontWeight: 700 }}>{pct}%</Typography>
@@ -580,10 +474,8 @@ const LevelMeters = () => (
 // ─── Footer ────────────────────────────────────────────────────────────────────
 const MixerFooter = () => (
   <Box sx={{
-    background: SURFACE_RAISED,
-    borderTop: `1px solid ${BORDER}`,
-    px: 2, py: 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    background: SURFACE_RAISED, borderTop: `1px solid ${BORDER}`,
+    px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   }}>
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
       <SignalCellularAltIcon sx={{ color: C_VINYL, fontSize: 16 }} />
@@ -608,8 +500,6 @@ function App() {
   return (
     <Box sx={{ backgroundColor: BG_DARK, minHeight: '100vh', color: TEXT_PRIMARY, fontFamily: '"Inter", "Roboto", sans-serif' }}>
       <MixerHeader />
- 
-      {/* Metric cards */}
       <Box sx={{ px: 2, pt: 2, pb: 0 }}>
         <Grid container spacing={1.5}>
           {[
@@ -625,32 +515,23 @@ function App() {
           ))}
         </Grid>
       </Box>
- 
-      {/* Main charts */}
       <Box sx={{ px: 2, pt: 2 }}>
         <Grid container spacing={1.5}>
-          {/* Full-width stacked area */}
           <Grid size={{ xs: 12 }}>
             <RevenueStackedChart />
           </Grid>
- 
-          {/* Left column: selector + meters */}
           <Grid size={{ xs: 12, md: 2 }}>
             <Stack spacing={1.5} sx={{ height: '100%' }}>
               <ChannelSelector />
               <LevelMeters />
             </Stack>
           </Grid>
- 
-          {/* Mid: streaming + vinyl */}
           <Grid size={{ xs: 12, md: 5 }}>
             <Stack spacing={1.5}>
               <StreamingGrowthChart />
               <VinylRevivalChart />
             </Stack>
           </Grid>
- 
-          {/* Right: donut + genres */}
           <Grid size={{ xs: 12, md: 5 }}>
             <Stack spacing={1.5}>
               <FormatShareChart />
@@ -659,7 +540,6 @@ function App() {
           </Grid>
         </Grid>
       </Box>
- 
       <Box sx={{ height: 12 }} />
       <MixerFooter />
     </Box>
@@ -667,3 +547,4 @@ function App() {
 }
  
 export default App;
+ 
