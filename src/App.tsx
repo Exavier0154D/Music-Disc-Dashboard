@@ -19,7 +19,7 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import AlbumIcon from '@mui/icons-material/Album';
 import HeadphonesIcon from '@mui/icons-material/Headphones';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -36,6 +36,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { db } from './firebase';
+import { collection, getDocs } from 'firebase/firestore';
  
 // ─── Theme tokens ──────────────────────────────────────────────────────────────
 const BG_DARK = '#16181d';
@@ -55,68 +57,119 @@ const C_OTHER = '#64748b';
 const ACCENT_TEAL = '#2dd4bf';
 const ACCENT_PINK = '#f472b6';
  
-// ─── Data ──────────────────────────────────────────────────────────────────────
-const yearlyData = [
+// ─── Types ─────────────────────────────────────────────────────────────────────
+type MusicRecord = {
+  Format: string;
+  Metric: string;
+  Year: number;
+  'Value(Actual)': number;
+};
+ 
+type YearlyRow = {
+  year: string;
+  vinyl: number;
+  cassette: number;
+  cd: number;
+  download: number;
+  streaming: number;
+};
+ 
+type VinylRow = { year: string; units: number };
+type StreamRow = { year: string; rev: number };
+ 
+// ─── Data transformation helpers ──────────────────────────────────────────────
+function buildYearlyData(records: MusicRecord[]): YearlyRow[] {
+  // Only use "Value (Adjusted)" metric, group by year
+  const adjusted = records.filter(r => r.Metric === 'Value (Adjusted)');
+  const byYear: Record<number, YearlyRow> = {};
+ 
+  const formatKey: Record<string, keyof Omit<YearlyRow, 'year'>> = {
+    'Streaming': 'streaming',
+    'Downloaded Music': 'download',
+    'CD': 'cd',
+    'Cassette': 'cassette',
+    'Vinyl': 'vinyl',
+    'LP/EP': 'vinyl',
+  };
+ 
+  adjusted.forEach(r => {
+    if (!byYear[r.Year]) {
+      byYear[r.Year] = { year: String(r.Year), vinyl: 0, cassette: 0, cd: 0, download: 0, streaming: 0 };
+    }
+    const key = formatKey[r.Format];
+    if (key) {
+      byYear[r.Year][key] += (r['Value(Actual)'] ?? 0) / 1000; // convert millions → billions
+    }
+  });
+ 
+  return Object.values(byYear)
+    .sort((a, b) => Number(a.year) - Number(b.year))
+    .filter(r => Number(r.year) % 2 === 1 || Number(r.year) >= 2020); // keep odd years + recent
+}
+ 
+function buildVinylRevival(records: MusicRecord[]): VinylRow[] {
+  const vinylUnits = records.filter(
+    r => (r.Format === 'Vinyl' || r.Format === 'LP/EP') &&
+         r.Metric === 'Units' &&
+         r.Year >= 2008
+  );
+  const byYear: Record<number, number> = {};
+  vinylUnits.forEach(r => {
+    byYear[r.Year] = (byYear[r.Year] ?? 0) + (r['Value(Actual)'] ?? 0) / 1000000;
+  });
+  return Object.entries(byYear)
+    .map(([year, units]) => ({ year, units: Math.round(units * 10) / 10 }))
+    .sort((a, b) => Number(a.year) - Number(b.year));
+}
+ 
+function buildStreamingGrowth(records: MusicRecord[]): StreamRow[] {
+  const streaming = records.filter(
+    r => r.Format === 'Streaming' &&
+         r.Metric === 'Value (Adjusted)' &&
+         r.Year >= 2010
+  );
+  const byYear: Record<number, number> = {};
+  streaming.forEach(r => {
+    byYear[r.Year] = (byYear[r.Year] ?? 0) + (r['Value(Actual)'] ?? 0) / 1000;
+  });
+  return Object.entries(byYear)
+    .map(([year, rev]) => ({ year, rev: Math.round(rev * 10) / 10 }))
+    .sort((a, b) => Number(a.year) - Number(b.year));
+}
+ 
+function buildShare2022(records: MusicRecord[]) {
+  const year2022 = records.filter(r => r.Year === 2022 && r.Metric === 'Value (Adjusted)');
+  const totals: Record<string, number> = {};
+  year2022.forEach(r => {
+    totals[r.Format] = (totals[r.Format] ?? 0) + (r['Value(Actual)'] ?? 0);
+  });
+  const total = Object.values(totals).reduce((s, v) => s + v, 0);
+  const colorMap: Record<string, string> = {
+    'Streaming': C_STREAMING,
+    'Vinyl': C_VINYL,
+    'LP/EP': C_VINYL,
+    'Downloaded Music': C_DOWNLOAD,
+    'CD': C_CD,
+  };
+  const items = Object.entries(totals).map(([name, val]) => ({
+    name,
+    value: Math.round((val / total) * 100),
+    color: colorMap[name] ?? C_OTHER,
+  }));
+  items.sort((a, b) => b.value - a.value);
+  // Merge small items into "Other"
+  const main = items.filter(i => i.value >= 2);
+  const otherVal = items.filter(i => i.value < 2).reduce((s, i) => s + i.value, 0);
+  if (otherVal > 0) main.push({ name: 'Other', value: otherVal, color: C_OTHER });
+  return main;
+}
+ 
+// ─── Static fallback data (used while loading) ────────────────────────────────
+const FALLBACK_YEARLY: YearlyRow[] = [
   { year: '1983', vinyl: 1.1, cassette: 2.5, cd: 0.1, download: 0, streaming: 0 },
-  { year: '1985', vinyl: 0.7, cassette: 3.4, cd: 0.7, download: 0, streaming: 0 },
-  { year: '1987', vinyl: 0.5, cassette: 4.0, cd: 2.0, download: 0, streaming: 0 },
-  { year: '1989', vinyl: 0.2, cassette: 4.8, cd: 4.8, download: 0, streaming: 0 },
-  { year: '1991', vinyl: 0.1, cassette: 4.1, cd: 7.2, download: 0, streaming: 0 },
-  { year: '1993', vinyl: 0.1, cassette: 3.0, cd: 9.2, download: 0, streaming: 0 },
-  { year: '1995', vinyl: 0.1, cassette: 1.7, cd: 11.5, download: 0, streaming: 0 },
-  { year: '1997', vinyl: 0.1, cassette: 0.9, cd: 13.0, download: 0, streaming: 0 },
   { year: '1999', vinyl: 0.1, cassette: 0.4, cd: 14.6, download: 0, streaming: 0 },
-  { year: '2001', vinyl: 0.1, cassette: 0.2, cd: 11.6, download: 0.1, streaming: 0 },
-  { year: '2003', vinyl: 0.1, cassette: 0.1, cd: 8.2, download: 0.5, streaming: 0 },
-  { year: '2005', vinyl: 0.1, cassette: 0.0, cd: 5.9, download: 1.5, streaming: 0 },
-  { year: '2007', vinyl: 0.2, cassette: 0.0, cd: 4.5, download: 2.9, streaming: 0 },
-  { year: '2009', vinyl: 0.2, cassette: 0.0, cd: 3.0, download: 2.8, streaming: 0 },
-  { year: '2011', vinyl: 0.3, cassette: 0.0, cd: 2.1, download: 2.6, streaming: 0.7 },
-  { year: '2013', vinyl: 0.5, cassette: 0.0, cd: 1.6, download: 2.3, streaming: 1.5 },
-  { year: '2015', vinyl: 0.6, cassette: 0.0, cd: 1.2, download: 1.9, streaming: 2.4 },
-  { year: '2017', vinyl: 1.0, cassette: 0.0, cd: 0.8, download: 1.3, streaming: 5.7 },
-  { year: '2019', vinyl: 1.2, cassette: 0.0, cd: 0.6, download: 0.8, streaming: 8.8 },
-  { year: '2021', vinyl: 1.2, cassette: 0.0, cd: 0.4, download: 0.6, streaming: 12.3 },
+  { year: '2010', vinyl: 0.2, cassette: 0.0, cd: 3.0, download: 2.8, streaming: 0.4 },
   { year: '2022', vinyl: 1.2, cassette: 0.0, cd: 0.4, download: 0.6, streaming: 13.3 },
-];
- 
-const share2022 = [
-  { name: 'Streaming', value: 84, color: C_STREAMING },
-  { name: 'Vinyl', value: 8, color: C_VINYL },
-  { name: 'Downloads', value: 4, color: C_DOWNLOAD },
-  { name: 'CD', value: 3, color: C_CD },
-  { name: 'Other', value: 1, color: C_OTHER },
-];
- 
-const vinylRevival = [
-  { year: '2008', units: 2.9 }, { year: '2009', units: 3.2 },
-  { year: '2010', units: 3.9 }, { year: '2011', units: 4.6 },
-  { year: '2012', units: 5.7 }, { year: '2013', units: 7.4 },
-  { year: '2014', units: 9.2 }, { year: '2015', units: 12.0 },
-  { year: '2016', units: 14.3 }, { year: '2017', units: 16.1 },
-  { year: '2018', units: 16.8 }, { year: '2019', units: 19.0 },
-  { year: '2020', units: 27.5 }, { year: '2021', units: 38.1 },
-  { year: '2022', units: 41.3 },
-];
- 
-const streamingGrowth = [
-  { year: '2010', rev: 0.4 }, { year: '2011', rev: 0.7 },
-  { year: '2012', rev: 1.0 }, { year: '2013', rev: 1.5 },
-  { year: '2014', rev: 2.0 }, { year: '2015', rev: 2.4 },
-  { year: '2016', rev: 3.9 }, { year: '2017', rev: 5.7 },
-  { year: '2018', rev: 7.4 }, { year: '2019', rev: 8.8 },
-  { year: '2020', rev: 10.1 }, { year: '2021', rev: 12.3 },
-  { year: '2022', rev: 13.3 },
-];
- 
-const topGenres = [
-  { genre: 'Hip-Hop / R&B', share: 26.8, color: C_STREAMING },
-  { genre: 'Pop', share: 19.1, color: ACCENT_PINK },
-  { genre: 'Rock', share: 14.4, color: C_CD },
-  { genre: 'Country', share: 8.7, color: C_CASSETTE },
-  { genre: 'Latin', share: 6.4, color: C_VINYL },
-  { genre: 'Dance / Electronic', share: 5.0, color: ACCENT_TEAL },
-  { genre: 'Other', share: 19.6, color: C_OTHER },
 ];
  
 // ─── Shared tooltip formatter helpers ─────────────────────────────────────────
@@ -269,7 +322,7 @@ const MixerHeader = () => (
 );
  
 // ─── Chart panels ──────────────────────────────────────────────────────────────
-const RevenueStackedChart = () => (
+const RevenueStackedChart = ({ data }: { data: YearlyRow[] }) => (
   <PanelShell
     title="Revenue by format — 1983 to 2022"
     controls={
@@ -295,7 +348,7 @@ const RevenueStackedChart = () => (
       ))}
     </Stack>
     <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={yearlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+      <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <defs>
           {[
             { id: 'gStream', color: C_STREAMING }, { id: 'gCD', color: C_CD },
@@ -322,34 +375,41 @@ const RevenueStackedChart = () => (
   </PanelShell>
 );
  
-const StreamingGrowthChart = () => (
-  <PanelShell title="Streaming revenue · 2010–2022" controls={<DeskKnob label="ZOOM" color={C_STREAMING} />}>
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
-      <Typography variant="h4" sx={{ color: C_STREAMING, fontWeight: 700 }}>$13.3B</Typography>
-      <Typography variant="caption" sx={{ color: C_VINYL, fontSize: '0.7rem' }}>↑ 8% vs 2021</Typography>
-    </Box>
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={streamingGrowth} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-        <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}B`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={fmtDollar} />
-        <Bar dataKey="rev" name="Revenue" fill={C_STREAMING} radius={[3, 3, 0, 0]}>
-          {streamingGrowth.map((_, i) => (
-            <Cell key={i} fill={i === streamingGrowth.length - 1 ? ACCENT_TEAL : C_STREAMING} fillOpacity={0.7 + (i / streamingGrowth.length) * 0.3} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  </PanelShell>
-);
+const StreamingGrowthChart = ({ data }: { data: StreamRow[] }) => {
+  const latest = data[data.length - 1];
+  const prev = data[data.length - 2];
+  const pct = latest && prev ? Math.round(((latest.rev - prev.rev) / prev.rev) * 100) : 8;
+  return (
+    <PanelShell title="Streaming revenue · 2010–2022" controls={<DeskKnob label="ZOOM" color={C_STREAMING} />}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
+        <Typography variant="h4" sx={{ color: C_STREAMING, fontWeight: 700 }}>
+          ${latest?.rev ?? 13.3}B
+        </Typography>
+        <Typography variant="caption" sx={{ color: C_VINYL, fontSize: '0.7rem' }}>↑ {pct}% vs prev year</Typography>
+      </Box>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+          <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} />
+          <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}B`} />
+          <Tooltip contentStyle={tooltipStyle} formatter={fmtDollar} />
+          <Bar dataKey="rev" name="Revenue" fill={C_STREAMING} radius={[3, 3, 0, 0]}>
+            {data.map((_, i) => (
+              <Cell key={i} fill={i === data.length - 1 ? ACCENT_TEAL : C_STREAMING} fillOpacity={0.7 + (i / data.length) * 0.3} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </PanelShell>
+  );
+};
  
-const FormatShareChart = () => (
+const FormatShareChart = ({ data }: { data: { name: string; value: number; color: string }[] }) => (
   <PanelShell title="2022 format share" controls={<DeskKnob label="PAN" color={ACCENT_PINK} />}>
     <ResponsiveContainer width="100%" height={200}>
       <PieChart>
-        <Pie data={share2022} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
-          {share2022.map((entry, i) => (
+        <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2} dataKey="value">
+          {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} fillOpacity={0.85} />
           ))}
         </Pie>
@@ -357,7 +417,7 @@ const FormatShareChart = () => (
       </PieChart>
     </ResponsiveContainer>
     <Stack spacing={0.5}>
-      {share2022.map(({ name, value, color }) => (
+      {data.map(({ name, value, color }) => (
         <Box key={name} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
@@ -370,23 +430,36 @@ const FormatShareChart = () => (
   </PanelShell>
 );
  
-const VinylRevivalChart = () => (
-  <PanelShell title="Vinyl revival · units shipped (M)" controls={<DeskKnob label="BASS" color={C_VINYL} />}>
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
-      <Typography variant="h4" sx={{ color: C_VINYL, fontWeight: 700 }}>41.3M</Typography>
-      <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>units in 2022</Typography>
-    </Box>
-    <ResponsiveContainer width="100%" height={170}>
-      <LineChart data={vinylRevival} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
-        <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} interval={2} />
-        <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={fmtUnits} />
-        <Line type="monotone" dataKey="units" stroke={C_VINYL} strokeWidth={2.5} dot={{ fill: C_VINYL, r: 3 }} activeDot={{ r: 5 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  </PanelShell>
-);
+const VinylRevivalChart = ({ data }: { data: VinylRow[] }) => {
+  const latest = data[data.length - 1];
+  return (
+    <PanelShell title="Vinyl revival · units shipped (M)" controls={<DeskKnob label="BASS" color={C_VINYL} />}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
+        <Typography variant="h4" sx={{ color: C_VINYL, fontWeight: 700 }}>{latest?.units ?? 41.3}M</Typography>
+        <Typography variant="caption" sx={{ color: TEXT_MUTED, fontSize: '0.7rem' }}>units in {latest?.year ?? 2022}</Typography>
+      </Box>
+      <ResponsiveContainer width="100%" height={170}>
+        <LineChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+          <XAxis dataKey="year" tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} interval={2} />
+          <YAxis tick={{ fill: TEXT_MUTED, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} />
+          <Tooltip contentStyle={tooltipStyle} formatter={fmtUnits} />
+          <Line type="monotone" dataKey="units" stroke={C_VINYL} strokeWidth={2.5} dot={{ fill: C_VINYL, r: 3 }} activeDot={{ r: 5 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </PanelShell>
+  );
+};
+ 
+const topGenres = [
+  { genre: 'Hip-Hop / R&B', share: 26.8, color: C_STREAMING },
+  { genre: 'Pop', share: 19.1, color: ACCENT_PINK },
+  { genre: 'Rock', share: 14.4, color: C_CD },
+  { genre: 'Country', share: 8.7, color: C_CASSETTE },
+  { genre: 'Latin', share: 6.4, color: C_VINYL },
+  { genre: 'Dance / Electronic', share: 5.0, color: ACCENT_TEAL },
+  { genre: 'Other', share: 19.6, color: C_OTHER },
+];
  
 const GenreShareChart = () => (
   <PanelShell title="Genre share · 2022" controls={<DeskKnob label="HIGH" color={ACCENT_PINK} />}>
@@ -497,9 +570,43 @@ const MixerFooter = () => (
  
 // ─── App ───────────────────────────────────────────────────────────────────────
 function App() {
+  const [records, setRecords] = useState<MusicRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+ 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'music_sales'));
+        const data = snapshot.docs.map(d => d.data() as MusicRecord);
+        setRecords(data);
+      } catch (err) {
+        console.error('Error fetching from Firestore:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+ 
+  // Derive chart datasets from Firestore records (or fallback while loading)
+  const yearlyData   = loading ? FALLBACK_YEARLY : buildYearlyData(records);
+  const vinylRevival = loading ? [] : buildVinylRevival(records);
+  const streamingGrowth = loading ? [] : buildStreamingGrowth(records);
+  const share2022    = loading ? [] : buildShare2022(records);
+ 
   return (
     <Box sx={{ backgroundColor: BG_DARK, minHeight: '100vh', color: TEXT_PRIMARY, fontFamily: '"Inter", "Roboto", sans-serif' }}>
       <MixerHeader />
+ 
+      {/* Loading indicator */}
+      {loading && (
+        <Box sx={{ px: 2, pt: 1 }}>
+          <Typography variant="caption" sx={{ color: ACCENT_TEAL, fontSize: '0.65rem', letterSpacing: 1 }}>
+            ⟳ LOADING FIRESTORE DATA...
+          </Typography>
+        </Box>
+      )}
+ 
       <Box sx={{ px: 2, pt: 2, pb: 0 }}>
         <Grid container spacing={1.5}>
           {[
@@ -515,10 +622,11 @@ function App() {
           ))}
         </Grid>
       </Box>
+ 
       <Box sx={{ px: 2, pt: 2 }}>
         <Grid container spacing={1.5}>
           <Grid size={{ xs: 12 }}>
-            <RevenueStackedChart />
+            <RevenueStackedChart data={yearlyData} />
           </Grid>
           <Grid size={{ xs: 12, md: 2 }}>
             <Stack spacing={1.5} sx={{ height: '100%' }}>
@@ -528,13 +636,13 @@ function App() {
           </Grid>
           <Grid size={{ xs: 12, md: 5 }}>
             <Stack spacing={1.5}>
-              <StreamingGrowthChart />
-              <VinylRevivalChart />
+              <StreamingGrowthChart data={streamingGrowth} />
+              <VinylRevivalChart data={vinylRevival} />
             </Stack>
           </Grid>
           <Grid size={{ xs: 12, md: 5 }}>
             <Stack spacing={1.5}>
-              <FormatShareChart />
+              <FormatShareChart data={share2022} />
               <GenreShareChart />
             </Stack>
           </Grid>
@@ -547,4 +655,3 @@ function App() {
 }
  
 export default App;
- 
